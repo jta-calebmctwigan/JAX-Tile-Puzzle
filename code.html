@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3x3 Tile Puzzle</title>
+<style>
+  /* General Reset & Font */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Helvetica, Arial, sans-serif; display: flex; flex-direction: column; align-items: center; background: #fff; min-height: 100vh; padding: 20px; }
+
+  h1 { margin-bottom: 16px; font-weight: 400; }
+
+  /* Board */
+  #board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-gap: 8px;
+    max-width: 600px;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+
+  .cell {
+    background: #e0e0e0;
+    border-radius: 6px;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+  }
+
+  .cell.correct {
+    outline: 3px solid #4caf50;
+  }
+
+  /* Tiles */
+  .tile {
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    cursor: grab;
+    user-select: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .tile.dragging {
+    opacity: 0.8;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    cursor: grabbing;
+    z-index: 100;
+  }
+
+  /* Tile tray */
+  #tile-tray {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    max-width: 600px;
+  }
+
+  #tile-tray .tile {
+    width: calc(33.33% - 8px);
+    aspect-ratio: 1 / 1;
+  }
+
+  /* Buttons */
+  button {
+    padding: 8px 16px;
+    margin: 8px;
+    font-size: 16px;
+    border: 1px solid #333;
+    background: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  button:hover { background: #f0f0f0; }
+</style>
+</head>
+<body>
+<h1>3x3 Tile Puzzle</h1>
+
+<div id="board" aria-label="Puzzle Board" role="grid">
+  <!-- 9 cells -->
+  <div class="cell" data-pos="0" role="gridcell" tabindex="0"></div>
+  <div class="cell" data-pos="1" role="gridcell" tabindex="0"></div>
+  <div class="cell" data-pos="2" role="gridcell" tabindex="0"></div>
+  <div class="cell" data-pos="3" role="gridcell" tabindex="0"></div>
+  <div class="cell" data-pos="4" role="gridcell" tabindex="0"></div>
+  <div class="cell" data-pos="5" role="gridcell" tabindex="0"></div>
+  <div class="cell" data-pos="6" role="gridcell" tabindex="0"></div>
+  <div class="cell" data-pos="7" role="gridcell" tabindex="0"></div>
+  <div class="cell" data-pos="8" role="gridcell" tabindex="0"></div>
+</div>
+
+<div id="tile-tray" aria-label="Tile Tray">
+  <!-- Tiles will be dynamically added -->
+</div>
+
+<button id="shuffle-btn">Shuffle Tiles</button>
+
+<script>
+const tileTray = document.getElementById('tile-tray');
+const board = document.getElementById('board');
+const shuffleBtn = document.getElementById('shuffle-btn');
+
+const totalTiles = 9;
+let tiles = [];
+
+// Generate tiles
+for (let i = 1; i <= totalTiles; i++) {
+  const img = document.createElement('img');
+  img.src = `/media/map_puzzle_${i.toString().padStart(2,'0')}.png`;
+  img.classList.add('tile');
+  img.setAttribute('draggable', 'true');
+  img.setAttribute('aria-grabbed', 'false');
+  img.setAttribute('data-id', i - 1); // correct position
+  tileTray.appendChild(img);
+  tiles.push(img);
+}
+
+// Shuffle tiles using Fisher-Yates
+function shuffle(array) {
+  let currentIndex = array.length, randomIndex;
+  while (currentIndex !== 0) {
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+  }
+  return array;
+}
+
+// Drag & Drop Logic
+let draggedTile = null;
+
+tileTray.addEventListener('dragstart', e => {
+  if(e.target.classList.contains('tile')){
+    draggedTile = e.target;
+    e.target.classList.add('dragging');
+    e.dataTransfer.setData('text/plain', e.target.dataset.id);
+  }
+});
+
+tileTray.addEventListener('dragend', e => {
+  if(e.target.classList.contains('tile')){
+    e.target.classList.remove('dragging');
+    draggedTile = null;
+  }
+});
+
+board.addEventListener('dragover', e => {
+  e.preventDefault();
+});
+
+board.addEventListener('drop', e => {
+  const cell = e.target.closest('.cell');
+  if (cell && draggedTile) {
+    if (cell.firstChild) { 
+      tileTray.appendChild(cell.firstChild); // swap back to tray
+    }
+    cell.appendChild(draggedTile);
+    checkCompletion();
+  }
+});
+
+// Shuffle function
+function shuffleTiles() {
+  const shuffled = shuffle([...tiles]);
+  shuffled.forEach(tile => tileTray.appendChild(tile));
+  // clear board
+  document.querySelectorAll('.cell').forEach(cell => cell.innerHTML = '');
+  document.querySelectorAll('.cell').forEach(c => c.classList.remove('correct'));
+}
+
+// Completion check
+function checkCompletion() {
+  let correctCount = 0;
+  document.querySelectorAll('.cell').forEach((cell, idx) => {
+    if(cell.firstChild && parseInt(cell.firstChild.dataset.id) === idx){
+      cell.classList.add('correct');
+      correctCount++;
+    } else {
+      cell.classList.remove('correct');
+    }
+  });
+  if(correctCount === totalTiles){
+    setTimeout(() => alert('🎉 Puzzle Complete!'), 100);
+  }
+}
+
+// Keyboard accessibility
+board.addEventListener('keydown', e => {
+  const cell = e.target.closest('.cell');
+  if (!cell) return;
+  const idx = Array.from(board.children).indexOf(cell);
+  let targetTile = tileTray.querySelector('.tile');
+  if(!targetTile) return;
+  switch(e.key){
+    case 'Enter':
+    case ' ':
+      if(!cell.firstChild){
+        cell.appendChild(targetTile);
+        checkCompletion();
+      }
+      e.preventDefault();
+      break;
+  }
+});
+
+shuffleBtn.addEventListener('click', shuffleTiles);
+
+// Initial shuffle
+shuffleTiles();
+</script>
+</body>
+</html>
